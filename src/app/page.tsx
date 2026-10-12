@@ -12,10 +12,13 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import prisma from "@/lib/prisma";
+import { ensureDatabaseReady } from "@/lib/db-init";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
+  await ensureDatabaseReady().catch(() => {});
+
   let recentFoundItems: any[] = [];
   let lostCount = 0;
   let foundCount = 0;
