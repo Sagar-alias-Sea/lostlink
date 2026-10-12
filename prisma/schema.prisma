@@ -1,0 +1,137 @@
+// Prisma schema for LostLink - Smart Lost & Found Portal
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  phone        String?
+  organization String?
+  passwordHash String
+  role         String   @default("USER") // USER | ADMIN
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  lostItems          LostItem[]
+  foundItems         FoundItem[]
+  claims             Claim[]
+  notifications      Notification[]
+  approvedRecoveries RecoveryRecord[] @relation("ApprovedByAdmin")
+}
+
+model LostItem {
+  id                String   @id @default(uuid())
+  reportId          String   @unique // e.g. LL-LST-2026-0001
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemName          String
+  category          String   // Electronics, ID Cards, Wallets, Keys, Documents, Bags, Accessories, Other
+  brand             String?
+  model             String?
+  color             String?
+  description       String
+  lostDate          String   // YYYY-MM-DD
+  lostTime          String?  // e.g. "14:30" or "Around 2 PM"
+  location          String
+  additionalDetails String?
+  imageUrl          String?
+  status            String   @default("SEARCHING") // SEARCHING, POSSIBLE_MATCH, CLAIM_PENDING, UNDER_VERIFICATION, VERIFIED, RECOVERED, CLOSED
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([category])
+  @@index([status])
+}
+
+model FoundItem {
+  id                String   @id @default(uuid())
+  reportId          String   @unique // e.g. LL-FND-2026-0001
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemName          String
+  category          String   // Electronics, ID Cards, Wallets, Keys, Documents, Bags, Accessories, Other
+  brand             String?
+  model             String?
+  color             String?
+  description       String
+  foundDate         String   // YYYY-MM-DD
+  foundTime         String?  // e.g. "11:15 AM"
+  location          String
+  additionalDetails String?
+  imageUrl          String?
+  status            String   @default("REPORTED") // REPORTED, POSSIBLE_MATCH, CLAIM_PENDING, UNDER_VERIFICATION, VERIFIED, READY_FOR_RECOVERY, RECOVERED, CLOSED
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  claims         Claim[]
+  recoveryRecord RecoveryRecord?
+
+  @@index([category])
+  @@index([status])
+}
+
+model Claim {
+  id              String    @id @default(uuid())
+  foundItemId     String
+  foundItem       FoundItem @relation(fields: [foundItemId], references: [id], onDelete: Cascade)
+  claimantId      String
+  claimant        User      @relation(fields: [claimantId], references: [id], onDelete: Cascade)
+  
+  // Ownership verification fields (7-point questionnaire)
+  description     String    // Detailed description of the item
+  lostLocation    String    // Where claimant lost it
+  lostTime        String    // When claimant lost it
+  uniqueMarks     String?   // Scratches, dents, stickers, serial notes
+  accessories     String?   // Accessories, case, keychain, cables
+  exactModel      String?   // Exact model number/specs
+  serialNumber    String?   // Serial number
+  identifyingInfo String?   // Private identifying features
+  evidenceUrl     String?   // Uploaded receipt, invoice or prior photo
+
+  status          String    @default("SUBMITTED") // SUBMITTED, UNDER_REVIEW, MORE_INFO_REQUIRED, APPROVED, REJECTED, CANCELLED
+  adminNotes      String?
+  createdAt       DateTime  @default(now())
+  reviewedAt      DateTime?
+
+  recoveryRecord  RecoveryRecord?
+
+  @@index([foundItemId])
+  @@index([claimantId])
+  @@index([status])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   // MATCH, CLAIM_STATUS, INFO_REQUEST, RECOVERY, SYSTEM
+  isRead    Boolean  @default(false)
+  linkUrl   String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+model RecoveryRecord {
+  id             String    @id @default(uuid())
+  foundItemId    String    @unique
+  foundItem      FoundItem @relation(fields: [foundItemId], references: [id], onDelete: Cascade)
+  claimId        String    @unique
+  claim          Claim     @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  approvedById   String
+  approvedBy     User      @relation("ApprovedByAdmin", fields: [approvedById], references: [id])
+  recoveredAt    DateTime  @default(now())
+  handoverNotes  String?
+  createdAt      DateTime  @default(now())
+}
