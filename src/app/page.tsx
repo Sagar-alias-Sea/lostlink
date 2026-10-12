@@ -16,18 +16,29 @@ import prisma from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  // Fetch live recent found items for immediate display on home page
-  const recentFoundItems = await prisma.foundItem.findMany({
-    take: 6,
-    orderBy: { createdAt: "desc" },
-    where: { status: { notIn: ["RECOVERED", "CLOSED"] } },
-  });
+  let recentFoundItems: any[] = [];
+  let lostCount = 0;
+  let foundCount = 0;
+  let recoveredCount = 0;
 
-  const [lostCount, foundCount, recoveredCount] = await Promise.all([
-    prisma.lostItem.count(),
-    prisma.foundItem.count(),
-    prisma.foundItem.count({ where: { status: "RECOVERED" } }),
-  ]);
+  try {
+    const [lost, found, recovered] = await Promise.all([
+      prisma.lostItem.count().catch(() => 0),
+      prisma.foundItem.count().catch(() => 0),
+      prisma.foundItem.count({ where: { status: "RECOVERED" } }).catch(() => 0),
+    ]);
+    lostCount = lost;
+    foundCount = found;
+    recoveredCount = recovered;
+
+    recentFoundItems = await prisma.foundItem.findMany({
+      take: 6,
+      orderBy: { createdAt: "desc" },
+      where: { status: { notIn: ["RECOVERED", "CLOSED"] } },
+    }).catch(() => []);
+  } catch (error) {
+    console.error("Home page database query handled safely:", error);
+  }
 
   return (
     <div className="space-y-16 pb-16">
